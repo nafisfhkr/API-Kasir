@@ -15,30 +15,35 @@ use App\Http\Controllers\API\V1\SupplierController;
 use App\Http\Controllers\API\V1\AuthController;
 use App\Http\Controllers\API\V1\JenisPenggunaController;
 use App\Http\Controllers\API\V1\DetailTransactionController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('v1')->group (function () {
-    Route::apiResource('/barang', BarangController::class);
-    Route::apiResource('/kategori', KategoriController::class);
-    Route::apiResource('/transactions', TransactionController::class);
-    Route::apiResource('/staff', StaffController::class);
-    Route::apiResource('/customers', CustomerController::class);
-    Route::apiResource('/supplier', SupplierController::class);
-    Route::apiResource('/laporantransaksi', LaporanTransaksiController::class);
-    Route::apiResource('/laporankeuangan', LaporanKeuanganController::class);
-    Route::apiResource('/piutang', PiutangController::class);
-    Route::apiResource('hutangs', HutangController::class);
-    Route::apiResource('/detail-transactions', DetailTransactionController::class);
-});
-Route::prefix('v1')->group (function () {
-    Route::controller(AuthController::class)->group(function () {
-        Route::post('/register', 'register');
-        Route::post('/login', 'login');
-        Route::post('/logout', 'logout')->middleware('auth:sanctum');
-    });
+Route::prefix('v1')->group(function () {
+    // --- Rute Publik (Tanpa Login) ---
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::get('/dashboard/stats', [LaporanTransaksiController::class, 'dashboardStats']);
+
+   
     Route::middleware('auth:sanctum')->group(function () {
-    Route::apiResource('/penggunas', PenggunaController::class);
-    Route::patch('/penggunas/{pengguna}/jenis', JenisPenggunaController::class);
+        Route::post('/logout', [AuthController::class, 'logout']);
+
+        // Data Master & Operasional
+        Route::apiResource('/barang', BarangController::class);
+        Route::apiResource('/kategori', KategoriController::class);
+        Route::apiResource('/transactions', TransactionController::class);
+        Route::apiResource('/staff', StaffController::class);
+        Route::apiResource('/customers', CustomerController::class);
+        Route::apiResource('/supplier', SupplierController::class);
+        Route::apiResource('/detail-transactions', DetailTransactionController::class);
+        
+        // Laporan & Keuangan
+        Route::apiResource('/laporantransaksi', LaporanTransaksiController::class);
+        Route::apiResource('/laporankeuangan', LaporanKeuanganController::class);
+        Route::apiResource('/piutang', PiutangController::class);
+        Route::apiResource('/hutangs', HutangController::class);
+
+        // Manajemen Pengguna
+        Route::apiResource('/penggunas', PenggunaController::class);
+        Route::patch('/penggunas/{pengguna}/jenis', JenisPenggunaController::class);
     });
 });

@@ -47,4 +47,9 @@ class Pengguna extends Model implements AuthenticatableContract
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+
+    public function getAuthPassword()
+{
+    return $this->Password;
+}
 }

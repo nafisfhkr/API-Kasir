@@ -23,35 +23,58 @@ class TransactionController extends Controller
      * Store a newly created resource in storage.
      */
     public function store(TransactionRequest $request)
-    {
-        $transaction = Transaction::create($request->validated());
-        return new TransactionResource($transaction);
+{
+   
+    return DB::transaction(function () use ($request) {
+    
+    $userLoggedIn = auth()->user();
+    $pengguna = $userLoggedIn->pengguna; 
+
+    if (!$pengguna) {
+        throw new \Exception("Profil pengguna tidak ditemukan.");
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Transaction $transaction)
-    {
-        $transaction->load(['penggunas', 'customers', 'detailTransactions']);
-        return new TransactionResource($transaction);
-    }
+    $transaction = Transaction::create([
+        'penggunaID' => $pengguna->id, // Diambil otomatis dari sistem
+        'CustomerID' => $request->CustomerID,
+        'Tanggal_transaksi' => now(),
+        'total_harga' => 0,
+        'metode_pembayaran' => $request->metode_pembayaran
+    ]);
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(TransactionRequest $request, Transaction $transaction)
-    {
-        $transaction->update($request->validated());
-        return new TransactionResource($transaction);
-    }
+        $totalHarga = 0;
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Transaction $transaction)
-    {
-        $transaction->delete();
-        return response()->json(['message' => 'Transaction deleted successfully'], Response::HTTP_NO_CONTENT);
-    }
+        // 2. Loop setiap item yang dikirim dari frontend
+        foreach ($request->items as $item) {
+            $barang = Barang::findOrFail($item['BarangID']);
+
+            // Cek apakah stok mencukupi
+            if ($barang->Stok < $item['qty']) {
+                throw new \Exception("Stok barang '{$barang->Nama_barang}' tidak mencukupi. Sisa stok: {$barang->Stok}");
+            }
+
+            // Hitung subtotal untuk item ini
+            $subtotal = $barang->Harga_jual * $item['qty'];
+            $totalHarga += $subtotal;
+
+            // 3. Simpan ke Detail Transaksi
+            DetailTransaction::create([
+                'TransaksiID' => $transaction->TransaksiID,
+                'BarangID' => $barang->BarangID,
+                'Jumlah_barang' => $item['qty'],
+                'harga_satuan' => $barang->Harga_jual,
+                'Subtotal' => $subtotal
+            ]);
+
+            // 4. Kurangi stok barang
+            $barang->decrement('Stok', $item['qty']);
+        }
+
+        // 5. Update total_harga akhir di tabel transactions
+        $transaction->update(['total_harga' => $totalHarga]);
+
+        // Return hasil dengan relasi detail agar frontend bisa menampilkan struk
+        return new TransactionResource($transaction->load(['detailTransactions.barang', 'customer']));
+    });
+}
 }

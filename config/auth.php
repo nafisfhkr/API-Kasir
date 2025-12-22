@@ -14,9 +14,9 @@ return [
     */
 
     'defaults' => [
-        'guard' => env('AUTH_GUARD', 'Pengguna'),
-        'passwords' => env('AUTH_PASSWORD_BROKER', 'penggunas'),
-    ],
+    'guard' => 'web', // Ubah kembali ke 'web' atau 'users'
+    'passwords' => 'users',
+],
 
     /*
     |--------------------------------------------------------------------------
