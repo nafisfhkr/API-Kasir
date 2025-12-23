@@ -7,17 +7,32 @@ use App\Http\Requests\BarangRequest;
 use App\Http\Resources\BarangResource;
 use App\Models\Barang;
 use Illuminate\Http\Response;
+use Illuminate\Http\Request;
 
 class BarangController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
-    {
-        $barang = Barang::all();
-        return BarangResource::collection($barang);
-    }
+    public function index(Request $request)
+{
+    // Ambil kata kunci dari query parameter 'search'
+    $search = $request->query('search');
+
+    // Jika ada kata kunci, cari berdasarkan Nama_barang
+    $barang = Barang::when($search, function ($query, $search) {
+        return $query->where('Nama_barang', 'like', "%{$search}%");
+    })
+    ->with('kategori') // Load relasi kategori agar informasinya lengkap
+    ->latest()
+    ->paginate(10); // Gunakan pagination agar API lebih profesional
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Daftar barang berhasil diambil',
+        'data' => $barang
+    ]);
+}
 
     /**
      * Store a newly created resource in storage.

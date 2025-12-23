@@ -14,15 +14,19 @@ class PenggunaFactory extends Factory
      *
      * @return array<string, mixed>
      */
-    public function definition(): array
-    {
-        return [
-            'name'=> $this->faker->name(),
-            'email'=> $this->faker->email(),
-            'password'=> $this->faker->password(),
-            'phone_number'=> $this->faker->phoneNumber(),
-            'referal_code'=> $this->faker->randomNumber(5),
-            'jenis_pengguna'=> $this->faker->randomElement(['admin', 'pembeli', 'kasir'])
-        ];
-    }
+    // File: database/factories/PenggunaFactory.php
+
+public function definition(): array
+{
+    return [
+        // Membuat User secara otomatis untuk setiap Pengguna
+        'user_id'       => \App\Models\User::factory(), 
+        'Nama'          => $this->faker->name(),
+        'Email'         => $this->faker->unique()->safeEmail(), // Menggunakan unique agar email tidak duplikat
+        'Password'      => bcrypt('password123'),
+        'No_hp'         => $this->faker->phoneNumber(),
+        'Code_referral' => $this->faker->randomNumber(5),
+        'Role'          => $this->faker->randomElement(['admin', 'kasir', 'pembeli']),
+    ];
+}
 }

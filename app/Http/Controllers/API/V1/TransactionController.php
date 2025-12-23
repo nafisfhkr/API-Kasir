@@ -7,6 +7,10 @@ use App\Http\Requests\TransactionRequest;
 use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
 use Illuminate\Http\Response;
+use App\Models\Barang;
+use App\Models\DetailTransaction;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class TransactionController extends Controller
 {
@@ -22,59 +26,72 @@ class TransactionController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(TransactionRequest $request)
+    public function store(Request $request)
 {
-   
-    return DB::transaction(function () use ($request) {
-    
-    $userLoggedIn = auth()->user();
-    $pengguna = $userLoggedIn->pengguna; 
+    // 1. Mulai Database Transaction untuk keamanan data
+    DB::beginTransaction();
 
-    if (!$pengguna) {
-        throw new \Exception("Profil pengguna tidak ditemukan.");
-    }
-
-    $transaction = Transaction::create([
-        'penggunaID' => $pengguna->id, // Diambil otomatis dari sistem
-        'CustomerID' => $request->CustomerID,
-        'Tanggal_transaksi' => now(),
-        'total_harga' => 0,
-        'metode_pembayaran' => $request->metode_pembayaran
-    ]);
+    try {
+     $transaction = Transaction::create([
+    'penggunaID'        => $request->penggunaID,
+    'CustomerID'        => $request->CustomerID,
+    'Tanggal_transaksi' => $request->Tanggal_transaksi, 
+    'total_harga'       => 0, 
+    'metode_pembayaran' => $request->metode_pembayaran,
+]);
 
         $totalHarga = 0;
 
-        // 2. Loop setiap item yang dikirim dari frontend
         foreach ($request->items as $item) {
-            $barang = Barang::findOrFail($item['BarangID']);
+            // Ambil data barang berdasarkan ID
+            $barang = Barang::find($item['BarangID']);
 
-            // Cek apakah stok mencukupi
-            if ($barang->Stok < $item['qty']) {
-                throw new \Exception("Stok barang '{$barang->Nama_barang}' tidak mencukupi. Sisa stok: {$barang->Stok}");
+            // --- VALIDASI STOK (PENTING!) ---
+            if (!$barang || $barang->Stok < $item['qty']) {
+                // Batalkan semua proses jika ada satu saja barang yang kurang stoknya
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => "Stok untuk barang '{$barang->Nama_barang}' tidak mencukupi. Sisa stok: {$barang->Stok}"
+                ], 400);
             }
 
-            // Hitung subtotal untuk item ini
+            // Hitung subtotal
             $subtotal = $barang->Harga_jual * $item['qty'];
             $totalHarga += $subtotal;
 
-            // 3. Simpan ke Detail Transaksi
+            // Simpan ke detail_transactions menggunakan nama kolom 'jumlah_barang'
             DetailTransaction::create([
                 'TransaksiID' => $transaction->TransaksiID,
                 'BarangID' => $barang->BarangID,
-                'Jumlah_barang' => $item['qty'],
+                'jumlah_barang' => $item['qty'],
                 'harga_satuan' => $barang->Harga_jual,
-                'Subtotal' => $subtotal
+                'subtotal' => $subtotal,
             ]);
 
-            // 4. Kurangi stok barang
+            // Kurangi stok barang
             $barang->decrement('Stok', $item['qty']);
         }
 
-        // 5. Update total_harga akhir di tabel transactions
+        // Update total harga di transaksi utama
         $transaction->update(['total_harga' => $totalHarga]);
 
-        // Return hasil dengan relasi detail agar frontend bisa menampilkan struk
-        return new TransactionResource($transaction->load(['detailTransactions.barang', 'customer']));
-    });
+        // Simpan semua perubahan
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi berhasil disimpan',
+            'data' => $transaction->load('details.barang')
+        ]);
+
+    } catch (\Exception $e) {
+        // Jika ada eror sistem, batalkan semua perubahan data
+        DB::rollBack();
+        return response()->json([
+            'success' => false,
+            'message' => 'Gagal melakukan transaksi: ' . $e->getMessage()
+        ], 500);
+    }
 }
 }
