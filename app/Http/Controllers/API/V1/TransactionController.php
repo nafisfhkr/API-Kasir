@@ -26,29 +26,28 @@ class TransactionController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(TransactionRequest $request)
 {
-    // 1. Mulai Database Transaction untuk keamanan data
+    \Log::info('Transaction Request:', $request->all()); 
+    \Log::info('penggunaID value:', ['penggunaID' => $request->input('penggunaID')]);
+
     DB::beginTransaction();
 
     try {
      $transaction = Transaction::create([
-    'penggunaID'        => $request->penggunaID,
-    'CustomerID'        => $request->CustomerID,
-    'Tanggal_transaksi' => $request->Tanggal_transaksi, 
+    'penggunaID'        => $request->input('penggunaID'),
+    'CustomerID'        => $request->input('CustomerID'),
+    'Tanggal_transaksi' => $request->input('Tanggal_transaksi'), 
     'total_harga'       => 0, 
-    'metode_pembayaran' => $request->metode_pembayaran,
+    'metode_pembayaran' => $request->input('metode_pembayaran'),
 ]);
 
         $totalHarga = 0;
 
         foreach ($request->items as $item) {
-            // Ambil data barang berdasarkan ID
             $barang = Barang::find($item['BarangID']);
 
-            // --- VALIDASI STOK (PENTING!) ---
             if (!$barang || $barang->Stok < $item['qty']) {
-                // Batalkan semua proses jika ada satu saja barang yang kurang stoknya
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
@@ -56,11 +55,9 @@ class TransactionController extends Controller
                 ], 400);
             }
 
-            // Hitung subtotal
             $subtotal = $barang->Harga_jual * $item['qty'];
             $totalHarga += $subtotal;
 
-            // Simpan ke detail_transactions menggunakan nama kolom 'jumlah_barang'
             DetailTransaction::create([
                 'TransaksiID' => $transaction->TransaksiID,
                 'BarangID' => $barang->BarangID,
@@ -69,14 +66,12 @@ class TransactionController extends Controller
                 'subtotal' => $subtotal,
             ]);
 
-            // Kurangi stok barang
             $barang->decrement('Stok', $item['qty']);
         }
 
-        // Update total harga di transaksi utama
         $transaction->update(['total_harga' => $totalHarga]);
 
-        // Simpan semua perubahan
+    
         DB::commit();
 
         return response()->json([

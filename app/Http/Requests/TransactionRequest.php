@@ -14,12 +14,13 @@ class TransactionRequest extends FormRequest
     public function rules(): array
 {
     return [
-        // 'penggunaID' dihapus dari sini karena diambil dari auth()
-        'CustomerID' => 'nullable|exists:customers,CustomerID',
-        'metode_pembayaran' => 'required|string|max:255',
-        'items' => 'required|array|min:1',
-        'items.*.BarangID' => 'required|exists:barang,BarangID',
-        'items.*.qty' => 'required|integer|min:1',
+        'penggunaID' => 'required|exists:penggunas,id', 
+            'CustomerID' => 'nullable|exists:customers,CustomerID',
+            'Tanggal_transaksi' => 'required|date',
+            'metode_pembayaran' => 'required|string|max:255',
+            'items' => 'required|array|min:1',
+            'items.*.BarangID' => 'required|exists:barang,BarangID',
+            'items.*.qty' => 'required|integer|min:1',
     ];
 }
 }
